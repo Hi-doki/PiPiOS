@@ -29,7 +29,7 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
 
 ---
 
-## Commands
+## Main Commands
 
 | Command|Description|Syntax|Example|
 |--------|-----------|-------|------|
@@ -41,7 +41,7 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
 |**`create_user`**|Create a new user. (Admins only).| `create_user <username> <password>`| `create_user alice pass123`|
 |**`login`**|Log in to an existing user account.| `login <username> <password>`| `login admin admin123`|
 |**`logout`**|Log out from the current session.| `logout`| `logout`|
-|**`help`**|Display a list of available commands with usage examples.| `help`| `help`|
+|**`help`**|Display a list of all available commands with usage examples.| `help`| `help`|
 
 ---
 
