@@ -1,6 +1,8 @@
 import os
 import json
 from cryptography.fernet import Fernet
+import threading
+import subprocess
 
 class FileSystem:
     def __init__(self, rootdir="~"):
@@ -250,12 +252,106 @@ class UserSystem:
             self.logged_in_user = None
             return "Logged out successfully."
         return "No user is currently logged in."
+    
+class SubprocessManager:
+    def __init__(self):
+        self.processes = {}  # Mapping of filename -> process object
+        self.lock = threading.Lock()
+
+    def start_process(self, file_path):
+        # Start a Python subprocess in the background.
+        with self.lock:
+            if file_path in self.processes:
+                return f"Process for '{file_path}' is already running."
+
+            try:
+                # Run the Python script in the background
+                process = subprocess.Popen(
+                    ["python", file_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                self.processes[file_path] = process
+                return f"Started process for '{file_path}'."
+            except Exception as e:
+                return f"Failed to start process: {str(e)}"
+
+    def list_processes(self):
+        # List all running processes
+        with self.lock:
+            if not self.processes:
+                return "No processes are currently running."
+            return "\n".join([f"{i+1}. {file}" for i, file in enumerate(self.processes.keys())])
+
+    def focus_process(self, file_path):
+        # Focus on a specific process to see its output
+        with self.lock:
+            if file_path not in self.processes:
+                return f"No running process found for '{file_path}'."
+
+            process = self.processes[file_path]
+            if process.poll() is not None:  # Check if process has exited
+                self.processes.pop(file_path)
+                return f"Process '{file_path}' has already terminated."
+
+            # Read the output and error streams
+            try:
+                output, errors = process.communicate(timeout=1)  # Non-blocking read
+                return f"Output:\n{output}\nErrors:\n{errors}"
+            except subprocess.TimeoutExpired:
+                return "The process is still running."
+
+    def terminate_process(self, file_path):
+        # Terminate a specific process
+        with self.lock:
+            if file_path not in self.processes:
+                return f"No running process found for '{file_path}'."
+
+            process = self.processes[file_path]
+            process.terminate()
+            process.wait()  # Wait for the process to exit
+            self.processes.pop(file_path)
+            return f"Terminated process for '{file_path}'."
+
+class FileImporter:
+    def __init__(self, file_system):
+        self.fs = file_system
+
+    def import_file(self, source_path, destination_path):
+        if not os.path.isfile(source_path):
+            return f"Error: Source file '{source_path}' does not exist."
+
+        # Read the file's content
+        try:
+            with open(source_path, 'r') as file:
+                content = file.read()
+        except Exception as e:
+            return f"Error reading file '{source_path}': {e}"
+
+        # Add the file to the simulated filesystem
+        try:
+            self.fs.edit_file(destination_path, content)
+            return f"File '{source_path}' successfully imported to '{destination_path}'."
+        except Exception as e:
+            return f"Error importing file: {e}"
+
+    def list_real_files(self, directory):
+        if not os.path.isdir(directory):
+            return f"Error: Directory '{directory}' does not exist."
+
+        try:
+            return os.listdir(directory)
+        except Exception as e:
+            return f"Error accessing directory '{directory}': {e}"
 
 
 class Commands:
     def __init__(self, file_system, user_system):
         self.fs = file_system
         self.user_system = user_system
+        self.subprocess_manager = SubprocessManager()
+        self.file_importer = FileImporter(file_system)
         self.command_info = {
             "cd": {
                 "description": "Change the current directory.",
@@ -310,7 +406,49 @@ class Commands:
                 "syntax": "read_file <file_path>",
                 "example": "read_file ~/users/admin/Home/Documents/note.txt",
                 "function": self.fs.read_file,
-            }
+            },
+            "subprocess_start": {
+                "description": "Start a Python file as a background process.",
+                "syntax": "subprocess_start <file_path>",
+                "example": "subprocess_start example.py",
+                "function": self.subprocess_start,
+            },
+            "subprocess_list": {
+                "description": "List all running background processes.",
+                "syntax": "subprocess_list",
+                "example": "subprocess_list",
+                "function": lambda: self.subprocess_manager.list_processes(),
+            },
+            "subprocess_focus": {
+                "description": "Focus on a specific process and display its output.",
+                "syntax": "subprocess_focus <file_path>",
+                "example": "subprocess_focus example.py",
+                "function": self.subprocess_focus,
+            },
+            "subprocess_terminate": {
+                "description": "Terminate a specific background process.",
+                "syntax": "subprocess_terminate <file_path>",
+                "example": "subprocess_terminate example.py",
+                "function": self.subprocess_terminate,
+            },
+            "subprocess_list":{
+                "description": "List all running background processes.",
+                "syntax": "subprocess_list",
+                "example": "subprocess_list",
+                "function": self.subprocess_list,
+            },
+            "import_file": {
+                "description": "Import a Python file from the real filesystem to the virtual filesystem.",
+                "syntax": "import_file <source_path> <destination_path>",
+                "example": "import_file C:\\path\\to\\file.py ~\\users\\admin\\Home\\Documents\\file.py",
+                "function": self.import_file,
+            },
+            "list_real_files": {
+                "description": "List all files in a real directory on the host filesystem.",
+                "syntax": "list_real_files <directory>",
+                "example": "list_real_files C:\\path\\to\\directory",
+                "function": self.list_real_files,
+            },
         }
 
     def create_user(self, username, password, admin_mode):
@@ -338,6 +476,40 @@ class Commands:
     def nano_file(self, file_path):
         """Invoke nano command to edit a file."""
         self.fs.nano(file_path)
+
+    def subprocess_start(self, file_path):
+        # Start a subprocess for a Python file
+        resolved_path = self.fs.resolve_path(file_path)
+        return self.subprocess_manager.start_process(resolved_path)
+
+    def subprocess_focus(self, file_path):
+        # Focus on a subprocess for a Python file
+        resolved_path = self.fs.resolve_path(file_path)
+        return self.subprocess_manager.focus_process(resolved_path)
+
+    def subprocess_terminate(self, file_path):
+        # Terminate a subprocess for a Python file
+        resolved_path = self.fs.resolve_path(file_path)
+        return self.subprocess_manager.terminate_process(resolved_path)
+    
+    def subprocess_list(self):
+        # List all running processes
+        return self.subprocess_manager.list_processes()
+    
+    def import_file(self, source_path, destination_path):
+        """
+        Import a Python file using FileImporter.
+        """
+        return self.file_importer.import_file(source_path, destination_path)
+
+    def list_real_files(self, directory):
+        """
+        List real files in a host directory using FileImporter.
+        """
+        result = self.file_importer.list_real_files(directory)
+        if isinstance(result, list):
+            return "\n".join(result)
+        return result
 
     def help_command(self):
         """Display available commands."""
