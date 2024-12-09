@@ -1,5 +1,12 @@
 # PiPiOS
 
+<div align="center">
+  <h3>Views</h3>
+  <img src="https://moe-counter.glitch.me/get/@:hidokipipi" align="center" />
+  <h4></h4>
+</div>
+
+
 PiPiOS is a simulated operating system built with Python, featuring a simple file system, user management, and a command-line interface. It allows users to create directories, edit files, manage user accounts, and more.
 
 ---
