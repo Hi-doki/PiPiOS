@@ -70,7 +70,7 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
 ### Running PiPiOS
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/PiPiOS.git
+   git clone https://github.com/hi-doki/PiPiOS.git
    cd PiPiOS
    ```
 2. Run the main script:
