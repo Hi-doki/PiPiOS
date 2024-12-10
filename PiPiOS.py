@@ -3,6 +3,7 @@ import json
 from cryptography.fernet import Fernet
 import threading
 import subprocess
+import tempfile
 
 class FileSystem:
     def __init__(self, rootdir="~"):
@@ -257,25 +258,61 @@ class SubprocessManager:
     def __init__(self):
         self.processes = {}  # Mapping of filename -> process object
         self.lock = threading.Lock()
+        self.fs = FileSystem()
+        
+    def get_file_content(self, virtual_path, filesystem):
+        parts = virtual_path.strip('~').split('/')
+        current = filesystem['~']
+        for part in parts:
+            if part in current:
+                current = current[part]
+            else:
+                raise FileNotFoundError(f"File '{virtual_path}' not found in virtual filesystem.")
+        if isinstance(current, str):
+            return current
+        else:
+            raise FileNotFoundError(f"File '{virtual_path}' not found in virtual filesystem.")
 
-    def start_process(self, file_path):
-        # Start a Python subprocess in the background.
+    def start_process(self, virtual_path):
         with self.lock:
-            if file_path in self.processes:
-                return f"Process for '{file_path}' is already running."
-
             try:
-                # Run the Python script in the background
+                # Load the virtual filesystem
+                filesystem = self.fs.load_filesystem()
+
+                # Get the content of the Python file from the virtual filesystem
+                content = self.get_file_content(virtual_path, filesystem)
+
+                # Replace \n with actual newline characters
+                formatted_content = content.replace('\\n', '\n')
+
+                # Write the formatted content to a temporary Python file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as temp_file:
+                    temp_file.write(formatted_content.encode('utf-8'))
+                    temp_file_path = temp_file.name
+
+                # Run the temporary Python script in the background
                 process = subprocess.Popen(
-                    ["python", file_path],
+                    ["python", temp_file_path],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True
                 )
-                self.processes[file_path] = process
-                return f"Started process for '{file_path}'."
+                self.processes[temp_file_path] = process
+                return f"Started process for '{temp_file_path}'."
             except Exception as e:
                 return f"Failed to start process: {str(e)}"
+
+    def read_output(self, file_path):
+        with self.lock:
+            if file_path not in self.processes:
+                return f"No running process found for '{file_path}'."
+
+            process = self.processes[file_path]
+            try:
+                output, errors = process.communicate(timeout=1)  # Non-blocking read
+                return f"Output:\n{output}\nErrors:\n{errors}"
+            except subprocess.TimeoutExpired:
+                return "The process is still running."
 
     def list_processes(self):
         # List all running processes
@@ -495,6 +532,11 @@ class Commands:
     def subprocess_list(self):
         # List all running processes
         return self.subprocess_manager.list_processes()
+    
+    def subprocess_read(self, file_path):
+        # Read the output of a specific process
+        resolved_path = self.fs.resolve_path(file_path)
+        return self.subprocess_manager.read_output(resolved_path)
     
     def import_file(self, source_path, destination_path):
         """
