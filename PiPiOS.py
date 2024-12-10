@@ -12,7 +12,7 @@ class FileSystem:
         self.load_filesystem()
 
     def load_filesystem(self):
-        # load filesystem structure from a JSON file if it exists."""
+        # load filesystem structure from a JSON file if it exists
         if os.path.exists("filesystem.json"):
             with open("filesystem.json", "r") as file:
                 self.file_structure = json.load(file)
@@ -26,7 +26,7 @@ class FileSystem:
             self.save_filesystem()
 
     def save_filesystem(self):
-        # save the filesystem structure to a JSON file.
+        # save the filesystem structure to a JSON file
         # use backslashes for all paths in the filesystem
         def convert_paths(obj):
             if isinstance(obj, dict):
@@ -37,7 +37,7 @@ class FileSystem:
             json.dump(convert_paths(self.file_structure), file, indent=4)
 
     def resolve_path(self, path):
-        # resolve absolute and relative paths using backslashes."""
+        # resolve absolute and relative paths using backslashes
         if path == "~":
             return self.rootdir  # ~ is the root
         if path.startswith("~/"):
@@ -47,7 +47,7 @@ class FileSystem:
         return os.path.join(self.current_path, path).replace("/", "\\")
 
     def change_directory(self, path):
-        # change the current directory."""
+        # change the current directory
         new_path = self.resolve_path(path)
         dirs = new_path.split("\\")  # split by backslash
         node = self.file_structure
@@ -65,7 +65,7 @@ class FileSystem:
             return f"Path '{path}' does not exist."
 
     def list_contents(self):
-        # list contents of the current directory."""
+        # list contents of the current directory
         dirs = self.current_path.split("\\")  # split by backslash
         node = self.file_structure
         for directory in dirs:
@@ -74,7 +74,7 @@ class FileSystem:
         return list(node.keys())
 
     def make_directory(self, directory_name):
-        # create a new directory."""
+        # create a new directory
         dirs = self.current_path.split("\\")  # split by backslash
         node = self.file_structure
         for directory in dirs:
@@ -87,7 +87,7 @@ class FileSystem:
         return f"Directory '{directory_name}' created."
 
     def read_file(self, file_path):
-        # read a file and return its content."""
+        # read a file and return its content
         full_path = self.resolve_path(file_path)  # resolve path relative to current directory
         path_parts = full_path.split("\\")  # split the path by backslash for traversal
         
@@ -109,7 +109,7 @@ class FileSystem:
             raise ValueError(f"Path '{file_path}' is not a file.")
 
     def edit_file(self, file_path, content):
-        # edit or create a file."""
+        # edit or create a file
         full_path = file_path.split("\\")  # split by backslash
         node = self.file_structure
         for part in full_path[:-1]:
@@ -120,7 +120,7 @@ class FileSystem:
         return f"File '{file_path}' updated successfully."
     
     def nano(self, file_path):
-        #edit a file using a simple text editor."""
+        #edit a file using a simple text editor
         # make sure that the file path is resolved relative to the current directory
         full_path = self.resolve_path(file_path)
         
@@ -147,7 +147,7 @@ class FileSystem:
                 content += line + "\n"
 
     def create_user_directory(self, username):
-        # create a home directory structure for a new user."""
+        # create a home directory structure for a new user
         # make sure the 'users' directory exists
         users_node = self.file_structure.setdefault("~", {}).setdefault("users", {})
 
@@ -165,7 +165,7 @@ class FileSystem:
             print(f"User '{username}' already has a home directory.")
 
     def set_user_home(self, username):
-        # set the current path to the user's home directory."""
+        # set the current path to the user's home directory
         user_home_path = os.path.join("~", "users", username, "Home").replace("/", "\\")
         print(f"Resolving home directory for user '{username}': {user_home_path}")
 
@@ -191,7 +191,7 @@ class UserSystem:
         self.load_users()
 
     def load_or_generate_key(self):
-        # load the encryption key from disk, or generate a new one."""
+        # load the encryption key from disk, or generate a new one
         if os.path.exists('secret.key'):
             with open('secret.key', 'rb') as file:
                 return file.read()
@@ -202,7 +202,7 @@ class UserSystem:
             return key
 
     def load_users(self):
-        # load users from the encrypted file."""
+        # load users from the encrypted file
         if os.path.exists('users.json'):
             with open('users.json', 'r') as file:
                 encrypted_data = json.load(file)
@@ -212,7 +212,7 @@ class UserSystem:
                     self.users[username] = {"password": decrypted_password, "admin": user_data["admin"]}
 
     def save_users(self):
-        # save the users' encrypted passwords to disk."""
+        # save the users' encrypted passwords to disk
         encrypted_data = {}
         for username, user_data in self.users.items():
             # encrypt password before saving
@@ -232,7 +232,7 @@ class UserSystem:
         return f"User '{username}' created."
 
     def validate_password(self, username, password):
-        # validate the user's password by comparing the decrypted version."""
+        # validate the user's password by comparing the decrypted version
         if username in self.users:
             # decrypt stored encrypted password
             decrypted_password = self.cipher.decrypt(self.users[username]["password"].encode()).decode()
@@ -240,7 +240,7 @@ class UserSystem:
         return False
 
     def login(self, username, password):
-        # log in a user by validating their password."""
+        # log in a user by validating their password
         if self.validate_password(username, password):
             self.logged_in_user = username
             return f"Logged in as {username}."
