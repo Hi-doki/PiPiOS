@@ -75,7 +75,7 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
    ```
 2. Run the main script:
    ```bash
-   python main.py
+   python pipios.py
    ```
 
 ### Example Usage
