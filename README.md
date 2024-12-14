@@ -95,7 +95,7 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
 ## File Structure
 ```plaintext
 .\
-├── main.py         # Main script to run PiPiOS
+├── pipios.py         # Main script to run PiPiOS
 ├── filesystem.json # JSON file representing the file system structure
 ├── users.json      # JSON file storing user data (encrypted passwords)
 ├── secret.key      # Encryption key for securing user passwords
