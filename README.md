@@ -70,12 +70,12 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
 ### Running PiPiOS
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/PiPiOS.git
+   git clone https://github.com/hi-doki/PiPiOS.git
    cd PiPiOS
    ```
 2. Run the main script:
    ```bash
-   python main.py
+   python pipios.py
    ```
 
 ### Example Usage
@@ -95,7 +95,7 @@ PiPiOS is a simulated operating system built with Python, featuring a simple fil
 ## File Structure
 ```plaintext
 .\
-├── main.py         # Main script to run PiPiOS
+├── pipios.py         # Main script to run PiPiOS
 ├── filesystem.json # JSON file representing the file system structure
 ├── users.json      # JSON file storing user data (encrypted passwords)
 ├── secret.key      # Encryption key for securing user passwords
