@@ -1,9 +1,11 @@
+from math import e
 import os
 import json
 from cryptography.fernet import Fernet
 import threading
 import subprocess
 import tempfile
+import importlib
 
 class FileSystem:
     def __init__(self, rootdir="~"):
@@ -387,8 +389,52 @@ class FileImporter:
             return os.listdir(directory)
         except Exception as e:
             return f"Error accessing directory '{directory}': {e}"
-
-
+        
+class Services:
+    def __init__(self, commands):
+        self.services = []
+        self.commands = commands
+    
+    def load_services(self):
+        #load services from a json file
+        if os.path.exists('services.json'):
+            with open('services.json', 'r') as file:
+                data = json.load(file)
+                service_names = [service['name'] for service in data['services']]
+                for service_name in service_names:
+                    self.load_service(service_name)
+            print(f"Loaded services: {self.services}")
+        else:
+            print("No services.json file found.")
+            #create a default services.json file with example services
+            default_services = {
+                "services": [
+                    {"name": "testservice", "authorURL": "https://github.com/hi-doki"}
+                ]
+            }
+            with open('services.json', 'w') as file:
+                json.dump(default_services, file, indent=4)
+            print("Created default services.json file.")
+    
+    def load_service(self, service_name):
+        try:
+            #import the service module
+            module = importlib.import_module(service_name)
+            #register the service with the commands class
+            if hasattr(module, 'register'):
+                module.register(self.commands)
+                self.services.append(service_name)
+                print(f"Service '{service_name}' loaded successfully.")
+            else:
+                print(f"Service '{service_name}' does not have a 'register' function.")
+                self.services[service_name] = service_name
+        except ImportError as e:
+            print(f"Failed to import service '{service_name}': {e}")
+        finally:
+            print(f"Current services: {self.services}")
+    
+    def list_services(self):
+        return "\n".join(self.services)
 class Commands:
     def __init__(self, file_system, user_system):
         # init the commands with the filesystem and user system
@@ -397,6 +443,13 @@ class Commands:
         self.subprocess_manager = SubprocessManager()
         self.file_importer = FileImporter(file_system)
         self.command_info = {
+            "cls": {
+                "description": "Clear the screen.",
+                "syntax": "cls",
+                "example": "cls",
+                "function": os.system("cls" if os.name == "nt" else "clear"),
+                "category": "misc",
+            },
             "cd": {
                 "description": "Change the current directory.",
                 "syntax": "cd <path>",
@@ -408,7 +461,7 @@ class Commands:
                 "description": "List contents of the current directory.",
                 "syntax": "ls",
                 "example": "ls",
-                "function": lambda: "\n".join(self.fs.list_contents()),
+                "function": self.list_files(),
                 "category": "files",
             },
             "mkdir": {
@@ -516,12 +569,26 @@ class Commands:
                 "function": self.change_password,
                 "category": "users",
             },
+            "list_services": {
+                "description": "List all available services.",
+                "syntax": "list_services",
+                "example": "list_services",
+                "function": self.list_services,
+                "category": "misc",
+            },
         }
         self.categories = {
             "files",
             "users",
             "misc",
         }
+
+    def list_services(self):
+        return os_instance.services.list_services()
+
+    def list_files(self):
+        self.fs.list_contents()
+        return "\n".join(self.fs.list_contents())
 
     def create_user(self, username, password, admin_mode):
         if username in self.user_system.users:
@@ -625,7 +692,8 @@ class Commands:
             func = self.command_info[cmd]["function"]
             try:
                 return func(*args)
-            except TypeError:
+            except TypeError as e:
+                print(e)
                 return f"Invalid syntax. Correct usage: {self.command_info[cmd]['syntax']}"
             except Exception as e:
                 return str(e)
@@ -636,28 +704,30 @@ class Commands:
 class PythonOS:
     def __init__(self):
         self.fs = FileSystem()
-        self.user_system = UserSystem()
-        self.commands = Commands(self.fs, self.user_system)
+        self.us = UserSystem()
+        self.commands = Commands(self.fs, self.us)
+        self.services = Services(self.commands)
+        self.services.load_services()
+        print(self.services.list_services())
 
         #automatically create the admin user if not already present
-        if "admin" not in self.user_system.users:
+        if "admin" not in self.us.users:
             result = self.commands.create_user("admin", "admin123", "true") 
             print(result)  #show admin creation status
             self.fs.create_user_directory("admin")  # create admins home directory
 
     def boot(self):
         print("Booting PiPiOS...")
-        print("Thinking of adding custom services soon but idk when :p")
 
     def show_login_screen(self):
         #displays the login screen until a user successfully logs in
-        while not self.user_system.logged_in_user:
+        while not self.us.logged_in_user:
             print("\nPlease log in.")
             usrname = input("Enter username: ").strip()
             passwd = input("Enter password: ").strip()
-            result = self.user_system.login(usrname, passwd)
+            result = self.us.login(usrname, passwd)
             print(result)
-            if self.user_system.logged_in_user:
+            if self.us.logged_in_user:
                 print(f"Welcome, {usrname}!\n")
                 try:
                     #set current directory to the users home directory after successful login
@@ -670,10 +740,13 @@ class PythonOS:
 
     def main(self):
         while True:
-            if self.user_system.logged_in_user:
+            if self.us.logged_in_user:
                 cmd_input = input(f"{self.fs.current_path} > ").strip()
                 if cmd_input == "exit":
-                    print("Shutting down...")
+                    self.shutdown()
+                    break
+                elif cmd_input == "shutdown":
+                    self.shutdown()
                     break
 
                 parts = cmd_input.split()
@@ -681,11 +754,25 @@ class PythonOS:
                 args = parts[1:]
                 print(self.commands.execute(cmd, args))
             else:
-                os.system("cls" if os.name == "nt" else "clear")
+                #os.system("cls" if os.name == "nt" else "clear")
                 self.show_login_screen()
+
+    def shutdown(self):
+        print("Shutting down PiPiOS...")
+        print(self.us.logout())
+        print(self.fs.save_filesystem())
+        print("PiPiOS has been shut down.")
 
 
 #start the OS
-os_instance = PythonOS()
-os_instance.boot()
-os_instance.main()
+
+try:
+    os_instance = PythonOS()
+    os_instance.boot()
+    os_instance.main()
+except KeyboardInterrupt:
+    print("\nKeyboardInterrupt:")
+    os_instance.shutdown()
+except Exception as e:
+    print(f"An error occurred: {str(e)}")
+    os_instance.shutdown()

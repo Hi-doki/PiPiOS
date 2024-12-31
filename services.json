@@ -1,0 +1,8 @@
+{
+    "services": [
+        {
+        "name": "testservice",
+        "authorURL": "https://github.com/hi-doki"
+        }
+    ]
+}
